@@ -24,7 +24,7 @@ pub async fn dispatch(ctx: &Ctx, command: &Command) -> Result<()> {
         Command::Calls(cmd) => calls::run(ctx, cmd).await,
         Command::Batches(cmd) => batches::run(ctx, cmd).await,
         Command::Auth(_) | Command::Completion { .. } => {
-            unreachable!("handled before a context is built")
+            anyhow::bail!("auth and completion run without an API context")
         }
     }
 }
