@@ -67,6 +67,7 @@ The CLI picks the base URL in this order: `--base-url`, `INGFAH_API_BASE_URL`, t
 | `teams list`, `teams get ID` | AI agent teams (products) |
 | `agents list`, `agents get SLUG` | Agents, with the published prompt and the bound tools |
 | `agents create --visibility private\|public ...` | Create an unpublished agent with a draft revision |
+| `agents delete SLUG` | Delete an agent and its revisions |
 | `agents revisions list SLUG`, `agents revisions get SLUG ID` | Revision history and content |
 | `agents revise SLUG ...` | Create a draft revision that changes only the fields you name |
 | `agents publish SLUG --revision ID` | Put a draft live, then check its tools and voice |
@@ -132,6 +133,14 @@ After the create, it reads the agent back and compares its draft revision (`ai_a
 ```sh
 ingfah agents publish ingfah-agent-mali --revision 31
 ```
+
+## Delete an agent
+
+```sh
+ingfah agents delete ingfah-agent-mali
+```
+
+`agents delete` reads the agent first, so the confirmation prompt names it. It then sends `DELETE /client/agents/SLUG` and prints `{id, slug, status}`. The API refuses with 400 to delete an agent that is on an active AI team (as the starting agent or a transfer target) or that has an open chat session; the CLI prints the API's `error_detail` and exits 1. Take the agent off the team first.
 
 ## Edit an agent safely
 

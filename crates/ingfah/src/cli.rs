@@ -201,6 +201,11 @@ pub enum AgentsCommand {
     },
     /// Create an agent with a first draft revision; publish it to put it live.
     Create(CreateArgs),
+    /// Delete an agent and its revisions for good.
+    Delete {
+        /// Agent slug.
+        slug: String,
+    },
     /// List or show revisions.
     #[command(subcommand)]
     Revisions(RevisionsCommand),

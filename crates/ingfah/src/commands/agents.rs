@@ -3,13 +3,13 @@ use ingfah_client::agent::{
     self, AgentType, BodyKind, FieldChange, ToolIds, check_revision_body, diff_bodies,
     newest_revision, unwrap_data,
 };
-use ingfah_client::{Error, Request};
+use ingfah_client::{Error, Method, Request};
 use serde_json::{Map, Value, json};
 use similar::TextDiff;
 
 use crate::cli::{AgentTypeArg, CreateArgs, FieldArgs, Format, ReviseArgs, Visibility};
 use crate::ctx::{Ctx, Sent};
-use crate::output::print_json;
+use crate::output::{print_json, print_object};
 
 struct AgentState {
     detail: Value,
@@ -216,6 +216,26 @@ pub async fn create(ctx: &Ctx, args: &CreateArgs) -> Result<()> {
         }
     }
     Ok(())
+}
+
+pub async fn delete(ctx: &Ctx, slug: &str) -> Result<()> {
+    let state = load_agent(ctx, slug).await?;
+    let name = [
+        state.detail.get("name"),
+        state.detail.pointer("/ai_agent_instruction_revision/name"),
+    ]
+    .into_iter()
+    .flatten()
+    .filter_map(Value::as_str)
+    .find(|n| !n.is_empty())
+    .unwrap_or(slug);
+    let note =
+        format!("Deletes agent `{name}` ({slug}) and all its revisions. This cannot be undone.");
+    let req = Request::new(Method::Delete, format!("/client/agents/{slug}"));
+    match ctx.write(req, Some(&note)).await? {
+        Sent::Sent(resp) => print_object(ctx.format, resp.body.json().unwrap_or(&Value::Null)),
+        Sent::DryRun => Ok(()),
+    }
 }
 
 fn apply_edits(
