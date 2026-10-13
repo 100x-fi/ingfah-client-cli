@@ -37,6 +37,10 @@ async fn agents_command(ctx: &Ctx, cmd: &AgentsCommand) -> Result<()> {
         AgentsCommand::Get { slug } => read::get(ctx, format!("/client/agents/{slug}")).await,
         AgentsCommand::Revisions(cmd) => read::revisions(ctx, cmd).await,
         AgentsCommand::Revise(args) => agents::revise(ctx, args).await,
-        AgentsCommand::Publish { slug, revision } => agents::publish(ctx, slug, *revision).await,
+        AgentsCommand::Publish {
+            slug,
+            revision,
+            allow_tool_drop,
+        } => agents::publish(ctx, slug, *revision, *allow_tool_drop).await,
     }
 }

@@ -189,7 +189,7 @@ fn voice_id(v: &Value) -> Option<u64> {
     v.pointer("/voice/id").and_then(Value::as_u64)
 }
 
-pub async fn publish(ctx: &Ctx, slug: &str, revision_id: u64) -> Result<()> {
+pub async fn publish(ctx: &Ctx, slug: &str, revision_id: u64, allow_tool_drop: bool) -> Result<()> {
     let newest = newest(ctx, slug).await?;
     if newest.id != revision_id {
         return Err(refused(format!(
@@ -216,6 +216,14 @@ pub async fn publish(ctx: &Ctx, slug: &str, revision_id: u64) -> Result<()> {
     let mut note =
         format!("Puts revision #{revision_id} live: every new call or chat with `{slug}` uses it.");
     let tool_changes = tools_before.changes_to(&expected_tools);
+    let dropped: Vec<&String> = tool_changes.iter().filter(|c| c.starts_with('-')).collect();
+    if !dropped.is_empty() && !allow_tool_drop {
+        let dropped: Vec<&str> = dropped.iter().map(|c| c.as_str()).collect();
+        return Err(refused(format!(
+            "refusing to publish revision #{revision_id}: it unbinds tools that are bound now: {}\nPass --allow-tool-drop if that is intended.",
+            dropped.join(" ")
+        )));
+    }
     if !tool_changes.is_empty() {
         note.push_str(&format!("\nTool links change: {}", tool_changes.join(" ")));
     }

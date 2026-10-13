@@ -253,7 +253,7 @@ async fn revise_refuses_setting_a_tool_list_directly() {
     assert!(posted_bodies(&server).await.is_empty());
 }
 
-async fn mount_publish_state(server: &MockServer, phone_after: Value) {
+async fn mount_publish_state(server: &MockServer, draft_phone: Value, phone_after: Value) {
     Mock::given(method("GET"))
         .and(path("/client/agents/mali/revisions"))
         .respond_with(ok(json!({"revisions": [
@@ -263,7 +263,7 @@ async fn mount_publish_state(server: &MockServer, phone_after: Value) {
         .await;
     let mut before = agent_detail(json!([{"id": 5}]));
     before["ai_agent_instruction_revision"] =
-        json!({"id": 18, "ai_plugin_functions": [{"id": 12}], "phone_tools": [{"id": 5}]});
+        json!({"id": 18, "ai_plugin_functions": [{"id": 12}], "phone_tools": draft_phone});
     Mock::given(method("GET"))
         .and(path("/client/agents/mali"))
         .respond_with(ok(before))
@@ -292,7 +292,7 @@ async fn mount_publish_state(server: &MockServer, phone_after: Value) {
 #[tokio::test(flavor = "multi_thread")]
 async fn publish_succeeds_when_tools_and_voice_match_the_revision() {
     let server = MockServer::start().await;
-    mount_publish_state(&server, json!([{"id": 5}])).await;
+    mount_publish_state(&server, json!([{"id": 5}]), json!([{"id": 5}])).await;
 
     ingfah(&server)
         .args(["--yes", "agents", "publish", "mali", "--revision", "18"])
@@ -304,7 +304,7 @@ async fn publish_succeeds_when_tools_and_voice_match_the_revision() {
 #[tokio::test(flavor = "multi_thread")]
 async fn publish_fails_loudly_when_a_tool_comes_unbound() {
     let server = MockServer::start().await;
-    mount_publish_state(&server, json!([])).await;
+    mount_publish_state(&server, json!([{"id": 5}]), json!([])).await;
 
     ingfah(&server)
         .args(["--yes", "agents", "publish", "mali", "--revision", "18"])
@@ -316,7 +316,7 @@ async fn publish_fails_loudly_when_a_tool_comes_unbound() {
 #[tokio::test(flavor = "multi_thread")]
 async fn publish_refuses_a_revision_that_is_not_the_newest() {
     let server = MockServer::start().await;
-    mount_publish_state(&server, json!([{"id": 5}])).await;
+    mount_publish_state(&server, json!([{"id": 5}]), json!([{"id": 5}])).await;
 
     ingfah(&server)
         .args(["--yes", "agents", "publish", "mali", "--revision", "17"])
@@ -325,4 +325,37 @@ async fn publish_refuses_a_revision_that_is_not_the_newest() {
         .stderr(contains("#18"));
 
     assert!(posted_bodies(&server).await.is_empty());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn publish_refuses_a_draft_that_unbinds_a_tool() {
+    let server = MockServer::start().await;
+    mount_publish_state(&server, json!([]), json!([])).await;
+
+    ingfah(&server)
+        .args(["--yes", "agents", "publish", "mali", "--revision", "18"])
+        .assert()
+        .code(3)
+        .stderr(contains("-phone:5"));
+
+    assert!(posted_bodies(&server).await.is_empty());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn publish_unbinds_a_tool_with_allow_tool_drop() {
+    let server = MockServer::start().await;
+    mount_publish_state(&server, json!([]), json!([])).await;
+
+    ingfah(&server)
+        .args([
+            "--yes",
+            "agents",
+            "publish",
+            "mali",
+            "--revision",
+            "18",
+            "--allow-tool-drop",
+        ])
+        .assert()
+        .success();
 }

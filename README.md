@@ -130,7 +130,7 @@ Then publish by id:
 ingfah agents publish mali --revision 18
 ```
 
-`agents publish` refuses a revision that is not the newest, because someone may have drafted after you. The prompt lists any change to tool links or voice. After publishing, it reads the agent again and exits 1 if the bound tools or the voice differ from the revision's.
+`agents publish` refuses a revision that is not the newest, because someone may have drafted after you. It also refuses a revision that would unbind a tool that is bound now, such as a draft made in the dashboard without its tools; pass `--allow-tool-drop` when that is intended. The prompt lists any change to tool links or voice. After publishing, it reads the agent again and exits 1 if the bound tools or the voice differ from the revision's.
 
 ## Exit codes
 

@@ -211,6 +211,9 @@ pub enum AgentsCommand {
         /// Revision id; must be the newest revision.
         #[arg(long)]
         revision: u64,
+        /// Publish even though the revision unbinds tools that are bound now.
+        #[arg(long)]
+        allow_tool_drop: bool,
     },
 }
 
