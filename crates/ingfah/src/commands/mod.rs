@@ -1,6 +1,8 @@
 pub mod agents;
 pub mod api;
 pub mod auth;
+pub mod batches;
+pub mod calls;
 pub mod read;
 
 use anyhow::Result;
@@ -19,7 +21,8 @@ pub async fn dispatch(ctx: &Ctx, command: &Command) -> Result<()> {
         Command::Voices(cmd) => read::voices(ctx, cmd).await,
         Command::Templates(cmd) => read::templates(ctx, cmd).await,
         Command::Analytics(cmd) => read::analytics(ctx, cmd).await,
-        Command::Calls(_) | Command::Batches(_) => anyhow::bail!("not implemented yet"),
+        Command::Calls(cmd) => calls::run(ctx, cmd).await,
+        Command::Batches(cmd) => batches::run(ctx, cmd).await,
         Command::Auth(_) | Command::Completion { .. } => {
             unreachable!("handled before a context is built")
         }
