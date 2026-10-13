@@ -1,3 +1,4 @@
+pub mod agents;
 pub mod api;
 pub mod auth;
 pub mod read;
@@ -11,7 +12,7 @@ pub async fn dispatch(ctx: &Ctx, command: &Command) -> Result<()> {
     match command {
         Command::Api(args) => api::run(ctx, args).await,
         Command::Teams(cmd) => read::teams(ctx, cmd).await,
-        Command::Agents(cmd) => agents(ctx, cmd).await,
+        Command::Agents(cmd) => agents_command(ctx, cmd).await,
         Command::Tools(cmd) => read::tools(ctx, cmd).await,
         Command::PhoneTools(cmd) => read::phone_tools(ctx, cmd).await,
         Command::TextChatTools(cmd) => read::text_chat_tools(ctx, cmd).await,
@@ -25,15 +26,14 @@ pub async fn dispatch(ctx: &Ctx, command: &Command) -> Result<()> {
     }
 }
 
-async fn agents(ctx: &Ctx, cmd: &AgentsCommand) -> Result<()> {
+async fn agents_command(ctx: &Ctx, cmd: &AgentsCommand) -> Result<()> {
     match cmd {
         AgentsCommand::List { list, agent_type } => {
             read::agents_list(ctx, list, agent_type.as_deref()).await
         }
         AgentsCommand::Get { slug } => read::get(ctx, format!("/client/agents/{slug}")).await,
         AgentsCommand::Revisions(cmd) => read::revisions(ctx, cmd).await,
-        AgentsCommand::Revise(_) | AgentsCommand::Publish { .. } => {
-            anyhow::bail!("not implemented yet")
-        }
+        AgentsCommand::Revise(args) => agents::revise(ctx, args).await,
+        AgentsCommand::Publish { slug, revision } => agents::publish(ctx, slug, *revision).await,
     }
 }
