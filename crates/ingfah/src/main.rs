@@ -72,13 +72,12 @@ fn report(e: &anyhow::Error) -> u8 {
 async fn run(cli: &Cli) -> Result<()> {
     match &cli.command {
         Command::Completion { shell } => {
-            clap_complete::generate(
-                *shell,
-                &mut Cli::command(),
-                "ingfah",
-                &mut std::io::stdout(),
-            );
-            Ok(())
+            let mut script = Vec::new();
+            clap_complete::generate(*shell, &mut Cli::command(), "ingfah", &mut script);
+            match std::io::Write::write_all(&mut std::io::stdout(), &script) {
+                Err(e) if e.kind() == std::io::ErrorKind::BrokenPipe => Ok(()),
+                other => Ok(other?),
+            }
         }
         Command::Auth(cmd) => commands::auth::run(cli, cmd).await,
         command => {

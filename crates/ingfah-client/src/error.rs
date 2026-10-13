@@ -115,7 +115,7 @@ pub enum Error {
     #[error("invalid base URL `{0}`: use https, or http only for localhost")]
     BaseUrl(String),
     /// Network or protocol failure.
-    #[error("request failed: {0}")]
+    #[error("request failed")]
     Http(#[from] reqwest::Error),
 }
 

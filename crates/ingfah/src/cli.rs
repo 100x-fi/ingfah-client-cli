@@ -3,6 +3,8 @@ use std::path::PathBuf;
 use clap::{Args, Parser, Subcommand, ValueEnum};
 use ingfah_client::agent::ToolRef;
 
+const GLOBAL: &str = "Global options";
+
 const AFTER_HELP: &str = "\
 Exit codes: 0 ok, 1 API or runtime error, 2 usage error, 3 refused by a guard
 (unknown route, tool drop, missing confirmation).
@@ -15,35 +17,35 @@ to print the request without sending it.";
 #[command(name = "ingfah", version, after_help = AFTER_HELP)]
 pub struct Cli {
     /// Profile: picks the stored key and the profile's base URL.
-    #[arg(long, env = "INGFAH_PROFILE", default_value = "default", global = true)]
+    #[arg(long, env = "INGFAH_PROFILE", hide_env_values = true, default_value = "default", global = true, help_heading = GLOBAL)]
     pub profile: String,
 
-    /// API key; overrides INGFAH_API_KEY and the stored key.
-    #[arg(long, global = true, hide_env_values = true)]
+    /// API key; overrides INGFAH_API_KEY and the key stored by `auth login`.
+    #[arg(long, global = true, help_heading = GLOBAL, hide_env_values = true)]
     pub api_key: Option<String>,
 
     /// API base URL [default: https://api.ingfah.ai].
-    #[arg(long, env = "INGFAH_API_BASE_URL", global = true)]
+    #[arg(long, env = "INGFAH_API_BASE_URL", hide_env_values = true, global = true, help_heading = GLOBAL)]
     pub base_url: Option<String>,
 
     /// Output format [default: table on a terminal, json otherwise].
-    #[arg(long, value_enum, global = true)]
+    #[arg(long, value_enum, global = true, help_heading = GLOBAL)]
     pub format: Option<Format>,
 
     /// Request timeout in seconds (downloads always get 120).
-    #[arg(long, default_value_t = 30, global = true)]
+    #[arg(long, default_value_t = 30, global = true, help_heading = GLOBAL)]
     pub timeout: u64,
 
     /// Skip confirmation prompts for writes.
-    #[arg(long, short = 'y', global = true)]
+    #[arg(long, short = 'y', global = true, help_heading = GLOBAL)]
     pub yes: bool,
 
     /// Print the write request that would be sent, and send nothing.
-    #[arg(long, global = true)]
+    #[arg(long, global = true, help_heading = GLOBAL)]
     pub dry_run: bool,
 
     /// More logging on stderr: -v requests, -vv headers (key redacted).
-    #[arg(long, short = 'v', action = clap::ArgAction::Count, global = true)]
+    #[arg(long, short = 'v', action = clap::ArgAction::Count, global = true, help_heading = GLOBAL)]
     pub verbose: u8,
 
     #[command(subcommand)]
@@ -405,4 +407,16 @@ fn parse_key_value(s: &str) -> Result<(String, String), String> {
     s.split_once('=')
         .map(|(k, v)| (k.to_owned(), v.to_owned()))
         .ok_or_else(|| format!("expected KEY=VALUE, got `{s}`"))
+}
+
+#[cfg(test)]
+mod tests {
+    use clap::CommandFactory;
+
+    use super::*;
+
+    #[test]
+    fn command_definition_is_consistent() {
+        Cli::command().debug_assert();
+    }
 }
