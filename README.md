@@ -9,6 +9,24 @@ The workspace has two crates:
 
 `spec/openapi.public.v1.yaml` is the vendored integration API spec. A test checks the route registry against it.
 
+## Output
+
+The typed commands and `ingfah api` print JSON in different shapes:
+
+- A typed command that reads one object (`agents get`, `teams get`, `batches get`, ...) prints the inner `data` object.
+- A typed list command (`agents list`, `calls list`, ...) prints the array of rows. The pagination block is dropped; use `--page` or `--all` instead.
+- A command that does several requests (`agents create`, `agents revise`, `agents publish`, `calls recording`) prints its own summary object.
+- `ingfah api` prints the response unchanged, in the raw `{status, data, pagination}` envelope, because it is the escape hatch for any route.
+
+```sh
+ingfah agents get mali | jq -r .slug
+ingfah agents list --all | jq -r '.[].slug'
+ingfah api GET /client/agents/mali | jq -r .data.slug
+ingfah api GET /client/ai-agents -q per_page=100 | jq '.data, .pagination'
+```
+
+Output is JSON whenever stdout is not a terminal, so these pipes need no `--format json`.
+
 ## Install
 
 ```sh

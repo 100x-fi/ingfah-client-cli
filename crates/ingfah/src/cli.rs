@@ -63,7 +63,7 @@ pub enum Command {
     /// Store, inspect or remove the API key for a profile.
     #[command(subcommand)]
     Auth(AuthCommand),
-    /// Call any allowed route directly and print the JSON.
+    /// Call any allowed route directly and print the raw response envelope.
     Api(ApiArgs),
     /// AI agent teams (products).
     #[command(subcommand)]
@@ -116,7 +116,15 @@ pub enum AuthCommand {
     Logout,
 }
 
+const API_AFTER_HELP: &str = "\
+Output: the response exactly as the API sends it, in the {status, data, pagination}
+envelope. Typed commands print only the inner data object, or the array of rows
+for a list.
+  ingfah api GET /client/agents/mali | jq .data.slug
+  ingfah agents get mali | jq .slug";
+
 #[derive(Debug, Args)]
+#[command(after_help = API_AFTER_HELP)]
 pub struct ApiArgs {
     /// HTTP method.
     pub method: String,
