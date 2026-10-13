@@ -245,11 +245,9 @@ Example:
   ingfah agents revise mali --set-file ai_instruction_task=task.md --add-tool plugin:12
   ingfah agents publish mali --revision 18";
 
+/// Field and tool flags shared by `agents create` and `agents revise`.
 #[derive(Debug, Args)]
-#[command(after_help = REVISE_AFTER_HELP)]
-pub struct ReviseArgs {
-    /// Agent slug.
-    pub slug: String,
+pub struct FieldArgs {
     /// Set a field: FIELD=VALUE.
     #[arg(long = "set", value_name = "FIELD=VALUE", value_parser = parse_key_value)]
     pub set: Vec<(String, String)>,
@@ -262,6 +260,15 @@ pub struct ReviseArgs {
     /// Link a tool: KIND:ID.
     #[arg(long, value_name = "KIND:ID")]
     pub add_tool: Vec<ToolRef>,
+}
+
+#[derive(Debug, Args)]
+#[command(after_help = REVISE_AFTER_HELP)]
+pub struct ReviseArgs {
+    /// Agent slug.
+    pub slug: String,
+    #[command(flatten)]
+    pub fields: FieldArgs,
     /// Unlink a tool: KIND:ID.
     #[arg(long, value_name = "KIND:ID")]
     pub remove_tool: Vec<ToolRef>,

@@ -332,10 +332,40 @@ pub enum FieldKind {
     Json,
 }
 
-/// A create-body field and where its current value lives in a revision detail.
+/// The two request bodies the field table feeds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BodyKind {
+    /// `POST /client/agents`: the agent and its first draft revision.
+    CreateAgent,
+    /// `POST /client/agents/{slug}/revisions`: a new draft revision.
+    CreateRevision,
+}
+
+/// Which bodies accept a field.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Accepts {
+    /// Both bodies; the value is stored on the revision.
+    Both,
+    /// Only the create-agent body; the value is stored on the agent, not the revision.
+    CreateAgent,
+    /// Only the create-revision body.
+    CreateRevision,
+}
+
+impl Accepts {
+    fn includes(self, body: BodyKind) -> bool {
+        match self {
+            Self::Both => true,
+            Self::CreateAgent => body == BodyKind::CreateAgent,
+            Self::CreateRevision => body == BodyKind::CreateRevision,
+        }
+    }
+}
+
+/// A body field and where its current value lives in a revision detail.
 #[derive(Debug, Clone, Copy)]
 pub struct Field {
-    /// Key in the create-revision body.
+    /// Key in the request body.
     pub body_key: &'static str,
     /// Keys to read in a revision detail, first match wins.
     pub detail_keys: &'static [&'static str],
@@ -343,6 +373,8 @@ pub struct Field {
     pub kind: FieldKind,
     /// Only sent for audio agents (the server drops it for text agents).
     pub audio_only: bool,
+    /// Which bodies accept it.
+    pub accepts: Accepts,
 }
 
 const fn field(
@@ -350,64 +382,134 @@ const fn field(
     detail_keys: &'static [&'static str],
     kind: FieldKind,
     audio_only: bool,
+    accepts: Accepts,
 ) -> Field {
     Field {
         body_key,
         detail_keys,
         kind,
         audio_only,
+        accepts,
     }
 }
 
-/// Every field a revision carries besides its tool lists. `voice_id` is read from `voice.id`.
+/// Every field an agent or revision body carries besides the tool lists, `type` and
+/// `visibility`. `voice_id` is read from `voice.id`.
 pub const FIELDS: &[Field] = &[
-    field("name", &["name"], FieldKind::Text, false),
-    field("vocal_name", &["vocal_name"], FieldKind::Text, false),
+    field("name", &["name"], FieldKind::Text, false, Accepts::Both),
+    field(
+        "vocal_name",
+        &["vocal_name"],
+        FieldKind::Text,
+        false,
+        Accepts::Both,
+    ),
     field(
         "ai_greeting_message",
         &["greeting_message", "ai_greeting_message"],
         FieldKind::Text,
         false,
+        Accepts::Both,
     ),
     field(
         "ai_instruction_identity",
         &["ai_instruction_identity"],
         FieldKind::Text,
         false,
+        Accepts::Both,
     ),
     field(
         "ai_instruction_task",
         &["ai_instruction_task"],
         FieldKind::Text,
         false,
+        Accepts::Both,
     ),
     field(
         "ai_instructions",
         &["ai_instructions"],
         FieldKind::Text,
         false,
+        Accepts::CreateRevision,
     ),
     field(
         "ai_instruction_flow",
         &["ai_instruction_flow"],
         FieldKind::Json,
         false,
+        Accepts::Both,
     ),
     field(
         "ai_instruction_variables",
         &["ai_instruction_variables"],
         FieldKind::Json,
         false,
+        Accepts::Both,
     ),
-    field("voice_id", &[], FieldKind::Json, true),
-    field("voice_speed", &["voice_speed"], FieldKind::Json, true),
+    field("voice_id", &[], FieldKind::Json, true, Accepts::Both),
+    field(
+        "voice_speed",
+        &["voice_speed"],
+        FieldKind::Json,
+        true,
+        Accepts::Both,
+    ),
     field(
         "prompt_engine_version",
         &["prompt_engine_version"],
         FieldKind::Text,
         false,
+        Accepts::Both,
+    ),
+    field(
+        "profile_url",
+        &[],
+        FieldKind::Text,
+        false,
+        Accepts::CreateAgent,
+    ),
+    field(
+        "description",
+        &[],
+        FieldKind::Text,
+        false,
+        Accepts::CreateAgent,
+    ),
+    field(
+        "ai_instruction_default_variables",
+        &[],
+        FieldKind::Json,
+        false,
+        Accepts::CreateAgent,
     ),
 ];
+
+/// Fields `POST /client/agents` refuses to go without; `vocal_name` only for audio agents.
+const CREATE_REQUIRED: &[&str] = &[
+    "name",
+    "vocal_name",
+    "ai_greeting_message",
+    "ai_instruction_identity",
+    "ai_instruction_task",
+];
+
+/// Required create-agent fields that are absent or blank, in table order. The server trims
+/// these, so a blank string counts as missing.
+pub fn missing_create_fields(
+    body: &Map<String, Value>,
+    agent_type: AgentType,
+) -> Vec<&'static str> {
+    CREATE_REQUIRED
+        .iter()
+        .copied()
+        .filter(|&key| !(key == "vocal_name" && agent_type == AgentType::Text))
+        .filter(|&key| {
+            body.get(key)
+                .and_then(Value::as_str)
+                .is_none_or(|s| s.trim().is_empty())
+        })
+        .collect()
+}
 
 /// Looks up an editable field by its body key.
 pub fn field_named(name: &str) -> Option<&'static Field> {
@@ -484,7 +586,9 @@ pub fn tools_to_preserve(agent: &Value, base_revision_id: u64) -> ToolIds {
 pub fn base_body(revision: &Value, tools: &ToolIds, agent_type: AgentType) -> Map<String, Value> {
     let mut body = Map::new();
     for f in FIELDS {
-        if f.audio_only && agent_type == AgentType::Text {
+        if (f.audio_only && agent_type == AgentType::Text)
+            || !f.accepts.includes(BodyKind::CreateRevision)
+        {
             continue;
         }
         if let Some(v) = detail_value(revision, f) {
@@ -508,8 +612,8 @@ fn ids_value(ids: &BTreeSet<u64>) -> Value {
 }
 
 /// Parses a `--set` value for a field.
-pub fn parse_field_value(name: &str, raw: &str) -> Result<Value, String> {
-    let f = field_named(name).ok_or_else(|| unknown_field(name))?;
+pub fn parse_field_value(target: BodyKind, name: &str, raw: &str) -> Result<Value, String> {
+    let f = lookup(target, name)?;
     match f.kind {
         FieldKind::Text => Ok(Value::String(raw.to_owned())),
         FieldKind::Json => {
@@ -518,25 +622,40 @@ pub fn parse_field_value(name: &str, raw: &str) -> Result<Value, String> {
     }
 }
 
-fn unknown_field(name: &str) -> String {
+fn lookup(target: BodyKind, name: &str) -> Result<&'static Field, String> {
+    let (what, tool_flags) = match target {
+        BodyKind::CreateAgent => ("a create-agent field", "--add-tool"),
+        BodyKind::CreateRevision => ("a revision field", "--add-tool / --remove-tool"),
+    };
     if ToolKind::ALL.iter().any(|k| k.body_key() == name) {
-        return format!("`{name}` changes only through --add-tool / --remove-tool");
+        return Err(format!("`{name}` changes only through {tool_flags}"));
     }
-    let known: Vec<&str> = FIELDS.iter().map(|f| f.body_key).collect();
-    format!(
-        "`{name}` is not a revision field; use one of {}",
-        known.join(", ")
-    )
+    match field_named(name) {
+        Some(f) if f.accepts.includes(target) => Ok(f),
+        _ => {
+            let known: Vec<&str> = FIELDS
+                .iter()
+                .filter(|f| f.accepts.includes(target))
+                .map(|f| f.body_key)
+                .collect();
+            Err(format!(
+                "`{name}` is not {what}; use one of {}",
+                known.join(", ")
+            ))
+        }
+    }
 }
 
-/// Sets one field, checking that it exists, applies to the agent, and has the right kind.
+/// Sets one field, checking that the body takes it, it applies to the agent, and it has
+/// the right kind.
 pub fn set_field(
     body: &mut Map<String, Value>,
+    target: BodyKind,
     agent_type: AgentType,
     name: &str,
     value: Value,
 ) -> Result<(), String> {
-    let f = field_named(name).ok_or_else(|| unknown_field(name))?;
+    let f = lookup(target, name)?;
     if f.audio_only && agent_type == AgentType::Text {
         return Err(format!("`{name}` does not apply to a text agent"));
     }
@@ -615,7 +734,8 @@ pub fn diff_bodies(old: &Map<String, Value>, new: &Map<String, Value>) -> Vec<Fi
 
 /// Compares what was sent against what the server stored. `stored` is the revision
 /// detail from GET; `created` is the create response, the only place a revision's
-/// tool ids are readable.
+/// tool ids are readable. Fields stored on the agent rather than the revision, and keys
+/// outside the field table, are not compared.
 pub fn readback_mismatches(
     sent: &Map<String, Value>,
     stored: &Value,
@@ -632,7 +752,9 @@ pub fn readback_mismatches(
             }
             continue;
         }
-        let Some(f) = field_named(key) else { continue };
+        let Some(f) = field_named(key).filter(|f| f.accepts != Accepts::CreateAgent) else {
+            continue;
+        };
         if key == "ai_instructions" && sent_value.as_str().is_some_and(str::is_empty) {
             continue;
         }
@@ -876,18 +998,93 @@ mod tests {
     #[test]
     fn set_field_refuses_tool_lists() {
         let mut body = Map::new();
-        let err = set_field(&mut body, AgentType::Audio, "phone_tools", json!([1]));
+        let err = set_field(
+            &mut body,
+            BodyKind::CreateRevision,
+            AgentType::Audio,
+            "phone_tools",
+            json!([1]),
+        );
         assert!(err.is_err_and(|e| e.contains("--add-tool")));
     }
 
     #[test]
     fn parse_field_value_reads_json_for_voice_id() {
-        assert_eq!(parse_field_value("voice_id", "4"), Ok(json!(4)));
+        assert_eq!(
+            parse_field_value(BodyKind::CreateRevision, "voice_id", "4"),
+            Ok(json!(4))
+        );
     }
 
     #[test]
     fn parse_field_value_keeps_text_verbatim() {
-        assert_eq!(parse_field_value("name", "4"), Ok(json!("4")));
+        assert_eq!(
+            parse_field_value(BodyKind::CreateRevision, "name", "4"),
+            Ok(json!("4"))
+        );
+    }
+
+    #[test]
+    fn set_field_refuses_agent_only_field_on_a_revision() {
+        let mut body = Map::new();
+        let err = set_field(
+            &mut body,
+            BodyKind::CreateRevision,
+            AgentType::Audio,
+            "description",
+            json!("x"),
+        );
+        assert!(err.is_err_and(|e| e.contains("not a revision field")));
+    }
+
+    #[test]
+    fn set_field_refuses_ai_instructions_on_create() {
+        let mut body = Map::new();
+        let err = set_field(
+            &mut body,
+            BodyKind::CreateAgent,
+            AgentType::Audio,
+            "ai_instructions",
+            json!("x"),
+        );
+        assert!(err.is_err_and(|e| e.contains("not a create-agent field")));
+    }
+
+    #[test]
+    fn missing_create_fields_lists_every_blank_required_field() {
+        let mut body = Map::new();
+        body.insert("name".to_owned(), json!("Mali"));
+        body.insert("ai_instruction_task".to_owned(), json!("  "));
+        assert_eq!(
+            missing_create_fields(&body, AgentType::Audio),
+            vec![
+                "vocal_name",
+                "ai_greeting_message",
+                "ai_instruction_identity",
+                "ai_instruction_task"
+            ]
+        );
+    }
+
+    #[test]
+    fn missing_create_fields_does_not_require_vocal_name_for_text() {
+        assert!(!missing_create_fields(&Map::new(), AgentType::Text).contains(&"vocal_name"));
+    }
+
+    #[test]
+    fn base_body_leaves_out_agent_only_fields() {
+        let mut revision = revision_detail();
+        revision["description"] = json!("note");
+        let body = base_body(&revision, &audio_bound(), AgentType::Audio);
+        assert!(!body.contains_key("description"));
+    }
+
+    #[test]
+    fn readback_skips_fields_stored_on_the_agent() {
+        let mut sent = Map::new();
+        sent.insert("description".to_owned(), json!("note"));
+        sent.insert("visibility".to_owned(), json!("public"));
+        assert!(readback_mismatches(&sent, &json!({}), &json!({}), AgentType::Audio).is_empty());
     }
 
     #[test]

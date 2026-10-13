@@ -1,13 +1,13 @@
 use anyhow::{Context, Result, anyhow, bail};
 use ingfah_client::agent::{
-    self, AgentType, FieldChange, ToolIds, check_revision_body, diff_bodies, newest_revision,
-    unwrap_data,
+    self, AgentType, BodyKind, FieldChange, ToolIds, check_revision_body, diff_bodies,
+    newest_revision, unwrap_data,
 };
 use ingfah_client::{Error, Request};
 use serde_json::{Map, Value, json};
 use similar::TextDiff;
 
-use crate::cli::{Format, ReviseArgs};
+use crate::cli::{FieldArgs, Format, ReviseArgs};
 use crate::ctx::{Ctx, Sent};
 use crate::output::print_json;
 
@@ -60,11 +60,16 @@ pub async fn revise(ctx: &Ctx, args: &ReviseArgs) -> Result<()> {
     let old = agent::base_body(&revision, &preserved, state.agent_type);
 
     let mut new = old.clone();
-    apply_edits(&mut new, state.agent_type, args)?;
+    apply_edits(
+        &mut new,
+        BodyKind::CreateRevision,
+        state.agent_type,
+        &args.fields,
+    )?;
     let removed = agent::apply_tool_edits(
         &mut new,
         state.agent_type,
-        &args.add_tool,
+        &args.fields.add_tool,
         &args.remove_tool,
     )
     .map_err(refused)?;
@@ -127,8 +132,9 @@ pub async fn revise(ctx: &Ctx, args: &ReviseArgs) -> Result<()> {
 
 fn apply_edits(
     body: &mut Map<String, Value>,
+    target: BodyKind,
     agent_type: AgentType,
-    args: &ReviseArgs,
+    args: &FieldArgs,
 ) -> Result<()> {
     if let Some(path) = &args.from_file {
         let text =
@@ -136,17 +142,17 @@ fn apply_edits(
         let edits: Map<String, Value> = serde_json::from_str(&text)
             .with_context(|| format!("{} must hold a JSON object of fields", path.display()))?;
         for (field, value) in edits {
-            agent::set_field(body, agent_type, &field, value).map_err(|e| anyhow!(e))?;
+            agent::set_field(body, target, agent_type, &field, value).map_err(|e| anyhow!(e))?;
         }
     }
     for (field, path) in &args.set_file {
         let text = std::fs::read_to_string(path).with_context(|| format!("reading {path}"))?;
-        let value = agent::parse_field_value(field, &text).map_err(|e| anyhow!(e))?;
-        agent::set_field(body, agent_type, field, value).map_err(|e| anyhow!(e))?;
+        let value = agent::parse_field_value(target, field, &text).map_err(|e| anyhow!(e))?;
+        agent::set_field(body, target, agent_type, field, value).map_err(|e| anyhow!(e))?;
     }
     for (field, raw) in &args.set {
-        let value = agent::parse_field_value(field, raw).map_err(|e| anyhow!(e))?;
-        agent::set_field(body, agent_type, field, value).map_err(|e| anyhow!(e))?;
+        let value = agent::parse_field_value(target, field, raw).map_err(|e| anyhow!(e))?;
+        agent::set_field(body, target, agent_type, field, value).map_err(|e| anyhow!(e))?;
     }
     Ok(())
 }
