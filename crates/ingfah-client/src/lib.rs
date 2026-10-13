@@ -3,6 +3,7 @@
 //! Every request resolves through [`routes::ROUTES`]; anything else is refused before it is
 //! sent. No printing and no prompts here, so the crate can back other front ends.
 
+pub mod agent;
 pub mod client;
 pub mod error;
 pub mod routes;
