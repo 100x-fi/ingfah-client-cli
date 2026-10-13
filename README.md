@@ -193,7 +193,7 @@ ingfah agents publish mali --revision 18
 | 0 | Success |
 | 1 | API or runtime error (the message, hint, and any `data` the error carries go to stderr) |
 | 2 | Usage error |
-| 3 | Refused by a guard: route not in the registry, tool drop, missing confirmation, or a file that already exists |
+| 3 | Refused by a guard: route not in the registry, tool drop, missing required fields, missing confirmation, or a file that already exists |
 
 ## Development
 
