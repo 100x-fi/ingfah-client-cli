@@ -199,6 +199,8 @@ pub enum AgentsCommand {
         /// Agent slug.
         slug: String,
     },
+    /// Create an agent with a first draft revision; publish it to put it live.
+    Create(CreateArgs),
     /// List or show revisions.
     #[command(subcommand)]
     Revisions(RevisionsCommand),
@@ -215,6 +217,49 @@ pub enum AgentsCommand {
         #[arg(long)]
         allow_tool_drop: bool,
     },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum AgentTypeArg {
+    Audio,
+    Text,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum Visibility {
+    /// Only the admin who created it (the key's admin) sees it.
+    Private,
+    /// Every admin of the client sees it.
+    Public,
+}
+
+const CREATE_AFTER_HELP: &str = "\
+Required fields: name, ai_greeting_message, ai_instruction_identity,
+ai_instruction_task, and vocal_name for an audio agent.
+
+Optional fields: profile_url, description, prompt_engine_version,
+ai_instruction_flow (JSON), ai_instruction_variables (JSON),
+ai_instruction_default_variables (JSON), voice_id (JSON, audio),
+voice_speed (JSON, audio).
+
+Tool kinds: plugin, phone (audio agents), text (text agents).
+
+Example:
+  ingfah agents create --visibility private --set name=Mali --set vocal_name=มะลิ \\
+    --set ai_greeting_message=สวัสดีค่ะ --set-file ai_instruction_identity=identity.md \\
+    --set-file ai_instruction_task=task.md --set voice_id=3 --add-tool plugin:12";
+
+#[derive(Debug, Args)]
+#[command(after_help = CREATE_AFTER_HELP)]
+pub struct CreateArgs {
+    /// Channel: audio takes calls, text takes chats.
+    #[arg(long = "type", value_enum, default_value = "audio")]
+    pub agent_type: AgentTypeArg,
+    /// Who can see and use the agent.
+    #[arg(long, value_enum)]
+    pub visibility: Visibility,
+    #[command(flatten)]
+    pub fields: FieldArgs,
 }
 
 #[derive(Debug, Subcommand)]

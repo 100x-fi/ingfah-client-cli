@@ -7,7 +7,7 @@ use ingfah_client::{Error, Request};
 use serde_json::{Map, Value, json};
 use similar::TextDiff;
 
-use crate::cli::{FieldArgs, Format, ReviseArgs};
+use crate::cli::{AgentTypeArg, CreateArgs, FieldArgs, Format, ReviseArgs, Visibility};
 use crate::ctx::{Ctx, Sent};
 use crate::output::print_json;
 
@@ -124,6 +124,94 @@ pub async fn revise(ctx: &Ctx, args: &ReviseArgs) -> Result<()> {
         Format::Json => print_json(&json!({"revision_id": new_id, "publish_command": publish}))?,
         Format::Table => {
             println!("Created draft revision #{new_id}; the stored values match what was sent.");
+            println!("Publish it with:\n  {publish}");
+        }
+    }
+    Ok(())
+}
+
+pub async fn create(ctx: &Ctx, args: &CreateArgs) -> Result<()> {
+    let (agent_type, type_name) = match args.agent_type {
+        AgentTypeArg::Audio => (AgentType::Audio, "audio"),
+        AgentTypeArg::Text => (AgentType::Text, "text"),
+    };
+    let visibility = match args.visibility {
+        Visibility::Private => "private",
+        Visibility::Public => "public",
+    };
+    let mut body = Map::new();
+    body.insert("type".to_owned(), json!(type_name));
+    body.insert("visibility".to_owned(), json!(visibility));
+    apply_edits(&mut body, BodyKind::CreateAgent, agent_type, &args.fields)?;
+    agent::apply_tool_edits(&mut body, agent_type, &args.fields.add_tool, &[]).map_err(refused)?;
+
+    let missing = agent::missing_create_fields(&body, agent_type);
+    if !missing.is_empty() {
+        return Err(refused(format!(
+            "refusing to create an agent without its required fields: {}\nSet each with --set FIELD=VALUE, --set-file FIELD=PATH or --from-file.",
+            missing.join(", ")
+        )));
+    }
+    let violations = check_revision_body(
+        agent_type,
+        &ToolIds::default(),
+        &Value::Object(body.clone()),
+    );
+    if !violations.is_empty() {
+        let lines: Vec<String> = violations.iter().map(|v| format!("  - {v}")).collect();
+        return Err(refused(format!(
+            "refusing to create an agent whose flow uses tools it does not link:\n{}\nLink each tool with --add-tool KIND:ID.",
+            lines.join("\n")
+        )));
+    }
+
+    let req = Request::post("/client/agents").json(Value::Object(body.clone()));
+    let note = "Creates an unpublished agent with a draft revision. Nothing goes live until you publish it.";
+    let created_envelope = match ctx.write(req, Some(note)).await? {
+        Sent::Sent(resp) => resp.body.json().cloned().unwrap_or(Value::Null),
+        Sent::DryRun => return Ok(()),
+    };
+    let created = unwrap_data(&created_envelope, "agent");
+    let slug = created
+        .get("slug")
+        .and_then(Value::as_str)
+        .context("the create response carried no agent slug")?;
+    let agent_id = created
+        .get("id")
+        .and_then(Value::as_u64)
+        .context("the create response carried no agent id")?;
+
+    let stored = load_agent(ctx, slug).await?;
+    let draft = stored
+        .detail
+        .get("ai_agent_instruction_revision")
+        .filter(|d| d.is_object())
+        .with_context(|| {
+            format!("agent `{slug}` was created, but reading it back shows no draft revision; inspect it with `ingfah agents get {slug}`")
+        })?;
+    let revision_id = draft
+        .get("id")
+        .and_then(Value::as_u64)
+        .with_context(|| format!("the draft revision of `{slug}` has no id"))?;
+    let mismatches = agent::readback_mismatches(&body, draft, draft, agent_type);
+    if !mismatches.is_empty() {
+        bail!(
+            "agent `{slug}` was created but its draft revision #{revision_id} differs from what was sent:\n  - {}\nDo not publish it; inspect it with `ingfah agents get {slug}`.",
+            mismatches.join("\n  - ")
+        );
+    }
+
+    let publish = format!("ingfah agents publish {slug} --revision {revision_id}");
+    match ctx.format {
+        Format::Json => print_json(&json!({
+            "slug": slug,
+            "agent_id": agent_id,
+            "revision_id": revision_id,
+            "publish_command": publish,
+        }))?,
+        Format::Table => {
+            println!("Created agent `{slug}` (id {agent_id}).");
+            println!("Draft revision #{revision_id}; the stored values match what was sent.");
             println!("Publish it with:\n  {publish}");
         }
     }

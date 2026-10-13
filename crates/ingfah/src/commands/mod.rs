@@ -35,6 +35,7 @@ async fn agents_command(ctx: &Ctx, cmd: &AgentsCommand) -> Result<()> {
             read::agents_list(ctx, list, agent_type.as_deref()).await
         }
         AgentsCommand::Get { slug } => read::get(ctx, format!("/client/agents/{slug}")).await,
+        AgentsCommand::Create(args) => agents::create(ctx, args).await,
         AgentsCommand::Revisions(cmd) => read::revisions(ctx, cmd).await,
         AgentsCommand::Revise(args) => agents::revise(ctx, args).await,
         AgentsCommand::Publish {

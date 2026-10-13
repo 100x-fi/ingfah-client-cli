@@ -66,6 +66,7 @@ The CLI picks the base URL in this order: `--base-url`, `INGFAH_API_BASE_URL`, t
 |---|---|
 | `teams list`, `teams get ID` | AI agent teams (products) |
 | `agents list`, `agents get SLUG` | Agents, with the published prompt and the bound tools |
+| `agents create --visibility private\|public ...` | Create an unpublished agent with a draft revision |
 | `agents revisions list SLUG`, `agents revisions get SLUG ID` | Revision history and content |
 | `agents revise SLUG ...` | Create a draft revision that changes only the fields you name |
 | `agents publish SLUG --revision ID` | Put a draft live, then check its tools and voice |
@@ -105,6 +106,32 @@ The CLI applies these rules to every request:
 - `--out FILE` never overwrites a file. The CLI does not print binary bodies to a terminal.
 - The CLI never prints the key or a presigned recording URL at the default verbosity. `calls recording` shows the URL only with `--show-url`. `-vv` traces show the key masked.
 - Only GETs are retried: three attempts on 408, 429 and 5xx, with backoff and `Retry-After` honoured. The CLI never retries a POST, PUT, PATCH or DELETE.
+
+## Create an agent
+
+`agents create` builds the body from the same `--set`, `--set-file`, `--from-file` and `--add-tool` flags as `agents revise`:
+
+```sh
+ingfah agents create --visibility private \
+  --set name=Mali --set vocal_name=มะลิ --set ai_greeting_message=สวัสดีค่ะ \
+  --set-file ai_instruction_identity=identity.md --set-file ai_instruction_task=task.md \
+  --set voice_id=3 --add-tool plugin:12 --add-tool phone:5
+ingfah agents create --type text --visibility public --from-file agent.json --add-tool text:1
+```
+
+`--type` is `audio` (the default) or `text`. `--visibility` is required. The required fields are `name`, `ai_greeting_message`, `ai_instruction_identity` and `ai_instruction_task`, plus `vocal_name` for an audio agent. The optional fields are `profile_url`, `description`, `prompt_engine_version`, `ai_instruction_flow`, `ai_instruction_variables`, `ai_instruction_default_variables`, and, for audio agents only, `voice_id` and `voice_speed`. `ai_instructions` cannot be set on create; set it later with `agents revise`.
+
+Before it sends anything, `agents create` refuses (exit 3):
+
+- a body without one or more required fields, naming every missing field;
+- a tool kind that does not apply to the type (`phone` on a text agent, `text` on an audio agent);
+- a flow node that names a tool the body does not link.
+
+After the create, it reads the agent back and compares its draft revision (`ai_agent_instruction_revision`) with what it sent. A mismatch exits 1. On success it prints the slug, the agent id, the draft revision id, and the publish command. The new agent's top-level prompt fields stay empty until you publish:
+
+```sh
+ingfah agents publish ingfah-agent-mali --revision 31
+```
 
 ## Edit an agent safely
 
