@@ -1,0 +1,20 @@
+[workspace]
+resolver = "3"
+members = ["crates/ingfah-client", "crates/ingfah"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "UNLICENSED"
+publish = false
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+unwrap_used = "warn"
+expect_used = "warn"
+
+[profile.release]
+lto = true
+strip = true
