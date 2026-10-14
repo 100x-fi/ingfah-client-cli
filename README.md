@@ -29,9 +29,15 @@ Output is JSON whenever stdout is not a terminal, so these pipes need no `--form
 
 ## Install
 
+You need a Rust toolchain (`brew install rust` or [rustup](https://rustup.rs)).
+
 ```sh
-cargo install --path crates/ingfah
+cargo install --locked --git https://github.com/100x-fi/ingfah-client-cli ingfah
 ```
+
+To upgrade, run the same command with `--force`. To install a checkout, use `cargo install --locked --path crates/ingfah`.
+
+cargo installs into `~/.cargo/bin`. rustup puts that on your `PATH`; with Homebrew's Rust, add `export PATH="$HOME/.cargo/bin:$PATH"` to `~/.zshrc`.
 
 Shell completions:
 
