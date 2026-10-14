@@ -6,6 +6,7 @@ members = ["crates/ingfah-client", "crates/ingfah"]
 version = "0.1.0"
 edition = "2024"
 license = "MIT"
+repository = "https://github.com/100x-fi/ingfah-client-cli"
 publish = false
 
 [workspace.lints.rust]
