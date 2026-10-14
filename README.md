@@ -29,7 +29,21 @@ Output is JSON whenever stdout is not a terminal, so these pipes need no `--form
 
 ## Install
 
-You need a Rust toolchain (`brew install rust` or [rustup](https://rustup.rs)).
+On macOS or Linux:
+
+```sh
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/100x-fi/ingfah-client-cli/releases/latest/download/ingfah-installer.sh | sh
+```
+
+On Windows:
+
+```powershell
+powershell -ExecutionPolicy Bypass -c "irm https://github.com/100x-fi/ingfah-client-cli/releases/latest/download/ingfah-installer.ps1 | iex"
+```
+
+The installers download a prebuilt binary from the latest GitHub Release. To upgrade, run the installer again.
+
+To build from source, you need a Rust toolchain (`brew install rust` or [rustup](https://rustup.rs)):
 
 ```sh
 cargo install --locked --git https://github.com/100x-fi/ingfah-client-cli ingfah
@@ -37,7 +51,7 @@ cargo install --locked --git https://github.com/100x-fi/ingfah-client-cli ingfah
 
 To upgrade, run the same command with `--force`. To install a checkout, use `cargo install --locked --path crates/ingfah`.
 
-cargo installs into `~/.cargo/bin`. rustup puts that on your `PATH`; with Homebrew's Rust, add `export PATH="$HOME/.cargo/bin:$PATH"` to `~/.zshrc`.
+Both the installers and cargo put `ingfah` in `~/.cargo/bin`. The installers and rustup put that on your `PATH`; with Homebrew's Rust, add `export PATH="$HOME/.cargo/bin:$PATH"` to `~/.zshrc`.
 
 Shell completions:
 
