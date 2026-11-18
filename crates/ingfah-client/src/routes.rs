@@ -129,6 +129,11 @@ const BATCH_W: &str = "client_outbound_batches:write";
 const CONV_W: &str = "text_chat_conversations:write";
 const CRM_R: &str = "crm_client_users:read";
 const CRM_W: &str = "crm_client_users:write";
+const SECRETS_W: &str = "secrets:write";
+const SHARE_R: &str = "share_links:read";
+const SHARE_W: &str = "share_links:write";
+const TTS_DICT_R: &str = "tts_dictionaries:read";
+const TTS_DICT_W: &str = "tts_dictionaries:write";
 
 /// Every operation a client API key may call through this CLI. `/get-call-token` and
 /// JWT-only routes are deliberately absent.
@@ -184,6 +189,7 @@ pub static ROUTES: &[Route] = &[
     ),
     // Agents
     r(Get, "/client/ai-agents", AGENT_R, Read),
+    r(Get, "/client/ai-agents/browse", AGENT_R, Read),
     r(Get, "/client/agents/{slug}", AGENT_R, Read),
     r(Get, "/client/agent-templates", AGENT_R, Read),
     r(Post, "/client/agents", AGENT_W, Write),
@@ -194,8 +200,15 @@ pub static ROUTES: &[Route] = &[
         AGENT_W,
         Write,
     ),
+    r(Put, "/client/agents/{agentSlug}/folder", AGENT_W, Write),
     r(Put, "/client/agents/{agentSlug}/profile", AGENT_W, Write),
     r(Put, "/client/agents/{agentSlug}/visibility", AGENT_W, Write),
+    // Agent folders
+    r(Get, "/client/ai-agent-folders", AGENT_R, Read),
+    r(Post, "/client/ai-agent-folders", AGENT_W, Write),
+    r(Put, "/client/ai-agent-folders/{id}", AGENT_W, Write),
+    r(Put, "/client/ai-agent-folders/{id}/parent", AGENT_W, Write),
+    r(Delete, "/client/ai-agent-folders/{id}", AGENT_W, Destructive),
     // Agent revisions
     r(Get, "/client/agents/{slug}/revisions", AGENT_R, Read),
     r(
@@ -231,6 +244,18 @@ pub static ROUTES: &[Route] = &[
         SESS_R,
         Read,
     ),
+    r(
+        Get,
+        "/client/products/{id}/chat-session-tests",
+        SESS_R,
+        Read,
+    ),
+    r(
+        Get,
+        "/client/products/{id}/chat-session-tests/{uuid}",
+        SESS_R,
+        Read,
+    ),
     // Tools
     r(Get, "/client/plugin-function-integrations", AGENT_R, Read),
     r(Get, "/client/plugin-functions", AGENT_R, Read),
@@ -250,14 +275,65 @@ pub static ROUTES: &[Route] = &[
         Live,
     ),
     r(
+        Post,
+        "/client/plugin-functions/test-code",
+        AGENT_W,
+        Live,
+    ),
+    r(
         Delete,
         "/client/plugin-functions/{id}",
         AGENT_W,
         Destructive,
     ),
     r(Get, "/client/phone-tools", AGENT_R, Read),
+    r(Get, "/client/phone-tools/catalog", AGENT_R, Read),
+    r(Get, "/client/phone-tools/{id}", AGENT_R, Read),
+    r(Post, "/client/phone-tools", AGENT_W, Write),
+    r(Patch, "/client/phone-tools/{id}", AGENT_W, Live),
+    r(Delete, "/client/phone-tools/{id}", AGENT_W, Destructive),
     r(Get, "/client/text-chat-tools", AGENT_R, Read),
     r(Get, "/client/voices", AGENT_R, Read),
+    // TTS dictionaries
+    r(Get, "/client/tts-dictionaries", TTS_DICT_R, Read),
+    r(Post, "/client/tts-dictionaries", TTS_DICT_W, Write),
+    r(Get, "/client/tts-dictionaries/{id}", TTS_DICT_R, Read),
+    r(Put, "/client/tts-dictionaries/{id}", TTS_DICT_W, Write),
+    r(Delete, "/client/tts-dictionaries/{id}", TTS_DICT_W, Destructive),
+    r(Get, "/client/tts-dictionaries/{id}/csv", TTS_DICT_R, Read),
+    r(Post, "/client/tts-dictionaries/{id}/csv", TTS_DICT_W, Write),
+    r(Get, "/client/tts-dictionaries/{id}/words", TTS_DICT_R, Read),
+    r(Post, "/client/tts-dictionaries/{id}/words", TTS_DICT_W, Write),
+    r(
+        Put,
+        "/client/tts-dictionaries/{id}/words/{wordId}",
+        TTS_DICT_W,
+        Write,
+    ),
+    r(
+        Delete,
+        "/client/tts-dictionaries/{id}/words/{wordId}",
+        TTS_DICT_W,
+        Destructive,
+    ),
+    r(Get, "/client/products/{id}/tts-dictionaries", PROD_R, Read),
+    r(Post, "/client/products/{id}/tts-dictionaries", PROD_W, Write),
+    r(Put, "/client/products/{id}/tts-dictionaries", PROD_W, Live),
+    r(
+        Delete,
+        "/client/products/{id}/tts-dictionaries/{ttsDictionaryId}",
+        PROD_W,
+        Destructive,
+    ),
+    // Secrets and share links
+    r(Get, "/client/secrets", SECRETS_W, Read),
+    r(Post, "/client/secrets", SECRETS_W, Write),
+    r(Put, "/client/secrets/{id}", SECRETS_W, Write),
+    r(Delete, "/client/secrets/{id}", SECRETS_W, Destructive),
+    r(Get, "/client/share-links", SHARE_R, Read),
+    r(Post, "/client/share-links", SHARE_W, Write),
+    r(Get, "/client/share-links/{id}/views", SHARE_R, Read),
+    r(Delete, "/client/share-links/{id}", SHARE_W, Destructive),
     // Chat sessions and calls
     r(Get, "/client/chat-sessions-list", SESS_R, Read),
     r(Get, "/client/chat-sessions-list/csv", SESS_R, Read),
@@ -304,14 +380,27 @@ pub static ROUTES: &[Route] = &[
     r(Post, "/client/outbound/options", OPT_W, Write),
     r(Put, "/client/outbound/options/{id}", OPT_W, Write),
     r(Delete, "/client/outbound/options/{id}", OPT_W, Destructive),
+    r(Get, "/client/outbound/batches", BATCH_R, Read),
     r(Post, "/client/outbound/batches", BATCH_W, Live),
     r(Get, "/client/outbound/batches/{id}", BATCH_R, Read),
     r(Get, "/client/outbound/batches/{id}/records", BATCH_R, Read),
     r(
         Get,
+        "/client/outbound/batches/{id}/records-summary",
+        BATCH_R,
+        Read,
+    ),
+    r(
+        Get,
         "/client/outbound/batches/{id}/records/download",
         BATCH_R,
         Read,
+    ),
+    r(
+        Patch,
+        "/client/outbound/batches/{id}/records/{recordId}",
+        BATCH_W,
+        Live,
     ),
     r(Get, "/client/outbound/call-data-records", BATCH_R, Read),
     r(Post, "/client/outbound/batches/{id}/pause", BATCH_W, Live),
@@ -344,9 +433,12 @@ pub static ROUTES: &[Route] = &[
     ),
     r(Get, "/client/text-analytics/heatmap", ANALYTICS_R, Read),
     // CRM and inbound admission
+    r(Get, "/crm/user", CRM_R, Read),
     r(Get, "/crm/users", CRM_R, Read),
+    r(Get, "/crm/users/{id}", CRM_R, Read),
     r(Post, "/crm/user", CRM_W, Write),
     r(Patch, "/crm/user", CRM_W, Write),
+    r(Patch, "/crm/users/{id}", CRM_W, Write),
     r(
         Get,
         "/client/calls/inbound-admission",
