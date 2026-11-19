@@ -208,7 +208,12 @@ pub static ROUTES: &[Route] = &[
     r(Post, "/client/ai-agent-folders", AGENT_W, Write),
     r(Put, "/client/ai-agent-folders/{id}", AGENT_W, Write),
     r(Put, "/client/ai-agent-folders/{id}/parent", AGENT_W, Write),
-    r(Delete, "/client/ai-agent-folders/{id}", AGENT_W, Destructive),
+    r(
+        Delete,
+        "/client/ai-agent-folders/{id}",
+        AGENT_W,
+        Destructive,
+    ),
     // Agent revisions
     r(Get, "/client/agents/{slug}/revisions", AGENT_R, Read),
     r(
@@ -274,12 +279,7 @@ pub static ROUTES: &[Route] = &[
         AGENT_W,
         Live,
     ),
-    r(
-        Post,
-        "/client/plugin-functions/test-code",
-        AGENT_W,
-        Live,
-    ),
+    r(Post, "/client/plugin-functions/test-code", AGENT_W, Live),
     r(
         Delete,
         "/client/plugin-functions/{id}",
@@ -299,11 +299,21 @@ pub static ROUTES: &[Route] = &[
     r(Post, "/client/tts-dictionaries", TTS_DICT_W, Write),
     r(Get, "/client/tts-dictionaries/{id}", TTS_DICT_R, Read),
     r(Put, "/client/tts-dictionaries/{id}", TTS_DICT_W, Write),
-    r(Delete, "/client/tts-dictionaries/{id}", TTS_DICT_W, Destructive),
+    r(
+        Delete,
+        "/client/tts-dictionaries/{id}",
+        TTS_DICT_W,
+        Destructive,
+    ),
     r(Get, "/client/tts-dictionaries/{id}/csv", TTS_DICT_R, Read),
     r(Post, "/client/tts-dictionaries/{id}/csv", TTS_DICT_W, Write),
     r(Get, "/client/tts-dictionaries/{id}/words", TTS_DICT_R, Read),
-    r(Post, "/client/tts-dictionaries/{id}/words", TTS_DICT_W, Write),
+    r(
+        Post,
+        "/client/tts-dictionaries/{id}/words",
+        TTS_DICT_W,
+        Write,
+    ),
     r(
         Put,
         "/client/tts-dictionaries/{id}/words/{wordId}",
@@ -317,7 +327,12 @@ pub static ROUTES: &[Route] = &[
         Destructive,
     ),
     r(Get, "/client/products/{id}/tts-dictionaries", PROD_R, Read),
-    r(Post, "/client/products/{id}/tts-dictionaries", PROD_W, Write),
+    r(
+        Post,
+        "/client/products/{id}/tts-dictionaries",
+        PROD_W,
+        Write,
+    ),
     r(Put, "/client/products/{id}/tts-dictionaries", PROD_W, Live),
     r(
         Delete,
