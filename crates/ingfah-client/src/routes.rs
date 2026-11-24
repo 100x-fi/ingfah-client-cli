@@ -134,6 +134,7 @@ const SHARE_R: &str = "share_links:read";
 const SHARE_W: &str = "share_links:write";
 const TTS_DICT_R: &str = "tts_dictionaries:read";
 const TTS_DICT_W: &str = "tts_dictionaries:write";
+const KB_UPLOAD: &str = "knowledge_base:upload";
 
 /// Every operation a client API key may call through this CLI. `/get-call-token` and
 /// JWT-only routes are deliberately absent.
@@ -340,7 +341,7 @@ pub static ROUTES: &[Route] = &[
         PROD_W,
         Destructive,
     ),
-    // Secrets and share links
+    // Secrets, share links, and knowledge upload
     r(Get, "/client/secrets", SECRETS_W, Read),
     r(Post, "/client/secrets", SECRETS_W, Write),
     r(Put, "/client/secrets/{id}", SECRETS_W, Write),
@@ -349,6 +350,7 @@ pub static ROUTES: &[Route] = &[
     r(Post, "/client/share-links", SHARE_W, Write),
     r(Get, "/client/share-links/{id}/views", SHARE_R, Read),
     r(Delete, "/client/share-links/{id}", SHARE_W, Destructive),
+    r(Post, "/client/{client_slug}/documents", KB_UPLOAD, Write),
     // Chat sessions and calls
     r(Get, "/client/chat-sessions-list", SESS_R, Read),
     r(Get, "/client/chat-sessions-list/csv", SESS_R, Read),
